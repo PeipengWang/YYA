@@ -5,7 +5,6 @@ from agent.tools.agri_tools import (
     judge_apple_phenological_period,
     calculate_water_fertilizer_amount,
     decision_trace_explain,
-    generate_decision_summary,
 )
 
 farming_tool_list = [
@@ -15,5 +14,4 @@ farming_tool_list = [
     judge_apple_phenological_period,
     calculate_water_fertilizer_amount,
     decision_trace_explain,
-    generate_decision_summary,
 ]

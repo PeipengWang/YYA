@@ -9,7 +9,6 @@ from agent.tools import (
     judge_apple_phenological_period,
     calculate_water_fertilizer_amount,
     decision_trace_explain,
-    generate_decision_summary,
 )
 from agent.tools.middleware import (
     monitor_tool,
@@ -31,7 +30,6 @@ class ReactAgent:
                 judge_apple_phenological_period,
                 calculate_water_fertilizer_amount,
                 decision_trace_explain,
-                generate_decision_summary,
             ],
             middleware=[
                 summary_middleware,
