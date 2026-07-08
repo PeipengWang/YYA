@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>沂源苹果智能农事助手 - 小沂</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* ========== Reset & Variables ========== */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --primary: #4caf50;
+            --primary-hover: #388e3c;
+            --user-bubble: #e8f5e9;
+            --ai-bubble: #f6f8fa;
+            --bg-start: #f5f9f5;
+            --bg-end: #e8f0e5;
+            --border: #e0e0e0;
+            --text: #2c3e50;
+            --text-secondary: #666;
+            --shadow: 0 2px 8px rgba(0,0,0,0.05);
+            --radius: 18px;
+            --transition: all 0.2s ease;
+        }
+
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, var(--bg-start) 0%, var(--bg-end) 100%);
+            min-height: 100vh;
+            display: flex;
+            color: var(--text);
+        }
+
+        /* ========== Main Chat Area ========== */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            min-width: 0;
+            position: relative;
+        }
+
+        .chat-header {
+            padding: 24px 32px 12px;
+            flex-shrink: 0;
+        }
+        .chat-header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+        .chat-header .subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        .chat-header .header-divider {
+            height: 1px;
+            background: var(--border);
+            margin-top: 16px;
+            margin-bottom: 0;
+        }
+
+        /* ========== Messages Container ========== */
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            scroll-behavior: smooth;
+        }
+
+        /* Custom scrollbar */
+        .messages::-webkit-scrollbar { width: 6px; }
+        .messages::-webkit-scrollbar-thumb {
+            background: #ddd;
+            border-radius: 3px;
+        }
+
+        /* ========== Message Bubbles ========== */
+        .msg {
+            max-width: 75%;
+            padding: 12px 18px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            animation: fadeIn 0.4s ease;
+            line-height: 1.6;
+            word-break: break-word;
+        }
+        .msg.user {
+            align-self: flex-end;
+            background: var(--user-bubble);
+            border-bottom-right-radius: 6px;
+        }
+        .msg.ai {
+            align-self: flex-start;
+            background: var(--ai-bubble);
+            border-bottom-left-radius: 6px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .msg .cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1em;
+            background: var(--primary);
+            margin-left: 2px;
+            animation: blink 0.8s infinite;
+            vertical-align: text-bottom;
+        }
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        /* ========== Markdown 完整样式 ========== */
+        .msg h1, .msg h2, .msg h3, .msg h4 { margin: 10px 0 6px; font-weight: 600; line-height: 1.3; }
+        .msg h1 { font-size: 1.3em; }
+        .msg h2 { font-size: 1.15em; }
+        .msg h3 { font-size: 1.05em; }
+        .msg p { margin: 4px 0; }
+        .msg strong { font-weight: 700; }
+        .msg em { font-style: italic; }
+        .msg ul, .msg ol { padding-left: 20px; margin: 4px 0; }
+        .msg li { margin: 2px 0; }
+        .msg blockquote {
+            margin: 8px 0;
+            padding: 6px 14px;
+            border-left: 4px solid var(--primary);
+            background: rgba(76,175,80,0.06);
+            color: #555;
+        }
+        .msg code {
+            background: rgba(0,0,0,0.06);
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .msg pre {
+            background: #2d2d2d;
+            color: #e0e0e0;
+            padding: 12px 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 8px 0;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        .msg pre code {
+            background: none;
+            padding: 0;
+            border-radius: 0;
+            color: inherit;
+            font-size: inherit;
+        }
+        .msg table {
+            border-collapse: collapse;
+            margin: 8px 0;
+            width: 100%;
+            font-size: 13px;
+        }
+        .msg th, .msg td {
+            border: 1px solid #d0d0d0;
+            padding: 6px 10px;
+            text-align: left;
+        }
+        .msg th {
+            background: #f0f4f0;
+            font-weight: 600;
+        }
+        .msg hr {
+            border: none;
+            border-top: 1px solid #d0d0d0;
+            margin: 10px 0;
+        }
+        .msg a {
+            color: var(--primary);
+            text-decoration: underline;
+        }
+
+        /* ========== Typing Indicator ========== */
+        .typing-indicator {
+            align-self: flex-start;
+            background: var(--ai-bubble);
+            border-radius: var(--radius);
+            border-bottom-left-radius: 6px;
+            box-shadow: var(--shadow);
+            padding: 16px 20px;
+            display: flex;
+            gap: 6px;
+            animation: fadeIn 0.4s ease;
+        }
+        .typing-indicator span {
+            width: 8px; height: 8px;
+            background: #888;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes bounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-8px); }
+        }
+
+        /* ========== Input Area ========== */
+        .input-area {
+            padding: 12px 32px 24px;
+            flex-shrink: 0;
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+        .input-wrapper {
+            flex: 1;
+            display: flex;
+            align-items: flex-end;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            padding: 8px 12px 8px 20px;
+            border: 1px solid transparent;
+            transition: var(--transition);
+        }
+        .input-wrapper:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 2px 14px rgba(76,175,80,0.12);
+        }
+        .input-wrapper textarea {
+            flex: 1;
+            border: none;
+            outline: none;
+            font-size: 15px;
+            font-family: inherit;
+            resize: none;
+            max-height: 120px;
+            min-height: 24px;
+            line-height: 1.5;
+            padding: 4px 0;
+        }
+        .input-wrapper textarea::placeholder { color: #aaa; }
+
+        .send-btn {
+            width: 40px; height: 40px;
+            border: none;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+        .send-btn:hover { background: var(--primary-hover); }
+        .send-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        .mic-btn {
+            width: 48px; height: 48px;
+            border: none;
+            border-radius: 50%;
+            background: #e8f5e9;
+            color: var(--primary);
+            font-size: 22px;
+            cursor: pointer;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+        .mic-btn:hover { background: #c8e6c9; }
+        .mic-btn.recording {
+            background: #ff4757;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255,71,87,0.4); }
+            50% { box-shadow: 0 0 0 12px rgba(255,71,87,0); }
+        }
+
+        /* ========== Toast ========== */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 10px 24px;
+            border-radius: 20px;
+            font-size: 14px;
+            z-index: 100;
+            animation: fadeIn 0.3s ease;
+            pointer-events: none;
+        }
+
+        /* ========== Responsive ========== */
+        @media (max-width: 768px) {
+            .msg { max-width: 90%; }
+        }
+
+        .empty-chat {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #bbb;
+            gap: 12px;
+        }
+        .empty-chat .icon { font-size: 56px; }
+        .empty-chat p { font-size: 16px; }
+
+    </style>
+</head>
+<body>
+
+<!-- ==================== Main Chat Area ==================== -->
+<main class="main">
+    <div class="chat-header">
+        <h1>🍎 沂源苹果智能农事助手</h1>
+        <p class="subtitle">🌾 精准感知 | 科学决策 | 沂源专属 | 全生育期管护</p>
+        <div class="header-divider"></div>
+    </div>
+
+    <div class="messages" id="messagesContainer">
+        <div class="empty-chat" id="emptyState">
+            <div class="icon">🍎</div>
+            <p>您好，我是小沂，请问果园需要什么帮助？</p>
+        </div>
+    </div>
+
+    <div class="input-area">
+        <div class="input-wrapper">
+            <textarea id="messageInput" rows="1"
+                placeholder="输入农事问题，如：果园需要怎么施肥浇水？"
+                onkeydown="handleKeyDown(event)"></textarea>
+            <button class="send-btn" id="sendBtn" onclick="sendMessage()" title="发送">
+                ➤
+            </button>
+        </div>
+        <button class="mic-btn" id="micBtn" onclick="toggleRecording()" title="语音输入">
+            🎤
+        </button>
+    </div>
+</main>
+
+<script>
+// ============================
+// State
+// ============================
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
+let isStreaming = false;
+let currentAudio = null;
+
+// ============================
+// Init
+// ============================
+document.addEventListener('DOMContentLoaded', () => {
+    autoResizeTextarea();
+});
+
+function autoResizeTextarea() {
+    const ta = document.getElementById('messageInput');
+    ta.addEventListener('input', () => {
+        ta.style.height = 'auto';
+        ta.style.height = Math.min(ta.scrollHeight, 120) + 'px';
+    });
+}
+
+// ============================
+// Markdown 转 HTML（使用 marked.js 完整解析）
+// ============================
+marked.setOptions({ breaks: true, gfm: true });
+
+function markdownToHtml(mdText) {
+    if (!mdText) return '';
+    return marked.parse(mdText);
+}
+
+// ============================
+// Chat
+// ============================
+function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+}
+
+async function sendMessage() {
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.src = "";
+        URL.revokeObjectURL(currentAudio.src);
+        currentAudio = null;
+    }
+    const input = document.getElementById('messageInput');
+    const prompt = input.value.trim();
+    if (!prompt || isStreaming) return;
+
+    input.value = '';
+    input.style.height = 'auto';
+    removeEmptyState();
+    appendMessage('user', prompt);
+    setStreaming(true);
+
+    const aiBubble = document.createElement('div');
+    aiBubble.className = 'msg ai';
+    const cursor = document.createElement('span');
+    cursor.className = 'cursor';
+    aiBubble.appendChild(cursor);
+    document.getElementById('messagesContainer').appendChild(aiBubble);
+    scrollToBottom();
+
+    let fullText = '';
+    let ttsText = '';
+
+    try {
+        const res = await fetch('/api/chat/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: prompt }),
+        });
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const data = JSON.parse(line.slice(6));
+
+                if (data.chunk) {
+                    fullText += data.chunk;
+                    const html = markdownToHtml(fullText);
+                    aiBubble.innerHTML = html;
+                    aiBubble.appendChild(cursor);
+                    scrollToBottom();
+                } else if (data.done) {
+                    ttsText = data.tts_text || '';
+                    cursor.remove();
+                } else if (data.error) {
+                    aiBubble.innerHTML = '抱歉，出错了：' + data.error;
+                    cursor.remove();
+                }
+            }
+        }
+    } catch (e) {
+        aiBubble.innerHTML = '网络错误：' + e.message;
+        cursor.remove();
+    } finally {
+        setStreaming(false);
+        scrollToBottom();
+
+        if (ttsText) {
+            playTTS(ttsText);
+        }
+    }
+}
+
+function appendMessage(role, content) {
+    const container = document.getElementById('messagesContainer');
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+    div.innerHTML = markdownToHtml(content);
+    container.appendChild(div);
+    scrollToBottom();
+    return div;
+}
+
+function removeEmptyState() {
+    const empty = document.getElementById('emptyState');
+    if (empty) empty.remove();
+}
+
+function scrollToBottom() {
+    const container = document.getElementById('messagesContainer');
+    container.scrollTop = container.scrollHeight;
+}
+
+function setStreaming(val) {
+    isStreaming = val;
+    document.getElementById('sendBtn').disabled = val;
+    document.getElementById('messageInput').disabled = val;
+}
+
+// ============================
+// TTS Audio Playback
+// ============================
+function playTTS(text) {
+    if (!text) return;
+
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.src = "";
+        URL.revokeObjectURL(currentAudio.src);
+        currentAudio = null;
+    }
+
+    const ttsUrl = "http://127.0.0.1:9000/tts-stream";
+    const fullUrl = `${ttsUrl}?text=${encodeURIComponent(text)}`;
+
+    fetch(fullUrl)
+        .then(response => {
+            if (!response.ok) throw new Error("TTS请求失败");
+            return response.blob();
+        })
+        .then(audioBlob => {
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            currentAudio = audio;
+
+            audio.play().catch(err => {
+                console.log("音频播放异常：", err);
+            });
+
+            audio.onended = () => {
+                URL.revokeObjectURL(audioUrl);
+                if (currentAudio === audio) {
+                    currentAudio = null;
+                }
+            };
+        })
+        .catch(err => {
+            console.log("TTS 接口请求失败，请检查 9533 服务是否启动", err);
+        });
+}
+
+// ============================
+// Audio Recording (ASR)
+// ============================
+async function toggleRecording() {
+    if (isRecording) {
+        stopRecording();
+    } else {
+        startRecording();
+    }
+}
+
+async function startRecording() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+            ? 'audio/webm;codecs=opus'
+            : 'audio/webm';
+
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) audioChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+            stream.getTracks().forEach(t => t.stop());
+            const blob = new Blob(audioChunks, { type: mimeType });
+            await transcribeAudio(blob);
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+        document.getElementById('micBtn').classList.add('recording');
+        document.getElementById('micBtn').textContent = '⏹';
+        showToast('正在录音...');
+    } catch (e) {
+        showToast('无法访问麦克风: ' + e.message);
+    }
+}
+
+function stopRecording() {
+    if (mediaRecorder && isRecording) {
+        mediaRecorder.stop();
+        isRecording = false;
+        document.getElementById('micBtn').classList.remove('recording');
+        document.getElementById('micBtn').textContent = '🎤';
+    }
+}
+
+async function sendMessageWithText(prompt) {
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.src = "";
+        URL.revokeObjectURL(currentAudio.src);
+        currentAudio = null;
+    }
+    if (!prompt || isStreaming) return;
+
+    const input = document.getElementById('messageInput');
+    input.value = '';
+    input.style.height = 'auto';
+    removeEmptyState();
+    appendMessage('user', prompt);
+    setStreaming(true);
+
+    const aiBubble = document.createElement('div');
+    aiBubble.className = 'msg ai';
+    const cursor = document.createElement('span');
+    cursor.className = 'cursor';
+    aiBubble.appendChild(cursor);
+    document.getElementById('messagesContainer').appendChild(aiBubble);
+    scrollToBottom();
+
+    let fullText = '';
+    let ttsText = '';
+
+    try {
+        const res = await fetch('/api/chat/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: prompt }),
+        });
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (!line.startsWith('data: ')) continue;
+                const data = JSON.parse(line.slice(6));
+                if (data.chunk) {
+                    fullText += data.chunk;
+                    const html = markdownToHtml(fullText);
+                    aiBubble.innerHTML = html;
+                    aiBubble.appendChild(cursor);
+                    scrollToBottom();
+                } else if (data.done) {
+                    ttsText = data.tts_text || '';
+                    cursor.remove();
+                } else if (data.error) {
+                    aiBubble.innerHTML = '抱歉，出错了：' + data.error;
+                    cursor.remove();
+                }
+            }
+        }
+    } catch (e) {
+        aiBubble.innerHTML = '网络错误：' + e.message;
+        cursor.remove();
+    } finally {
+        setStreaming(false);
+        scrollToBottom();
+        if (ttsText) {
+            playTTS(ttsText);
+        }
+    }
+}
+
+async function transcribeAudio(blob) {
+    showToast('语音识别中...');
+    const formData = new FormData();
+    formData.append('file', blob, 'voice.webm');
+
+    try {
+        const res = await fetch('/api/asr', { method: 'POST', body: formData });
+        const data = await res.json();
+        const voiceText = data.text || "";
+
+        if (voiceText) {
+            showToast('识别成功，自动发送');
+            await sendMessageWithText(voiceText);
+        } else {
+            showToast('未识别到语音内容');
+        }
+    } catch (e) {
+        showToast('语音识别失败');
+    }
+}
+
+// ============================
+// Toast
+// ============================
+let toastTimer;
+function showToast(msg, duration = 2000) {
+    clearTimeout(toastTimer);
+    let el = document.querySelector('.toast');
+    if (!el) {
+        el = document.createElement('div');
+        el.className = 'toast';
+        document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.style.opacity = '1';
+    toastTimer = setTimeout(() => {
+        el.style.opacity = '0';
+        setTimeout(() => el.remove(), 300);
+    }, duration);
+}
+</script>
+
+</body>
+</html>

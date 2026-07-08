@@ -1,0 +1,26 @@
+# ============================================================
+# 沂源苹果专属RAG知识库 — Chroma向量存储配置
+# ============================================================
+
+# 向量库集合名称
+collection_name: apple_farming_knowledge
+
+# 向量库持久化目录
+persist_directory: chroma_db
+
+# 检索返回Top-K文档数
+k: 5
+
+# 知识库文件存放路径
+data_path: data\apple_knowledge
+
+# 已处理文件MD5记录文件
+md5_hex_store: md5.text
+
+# 允许加载的知识库文件类型
+allow_knowledge_file_type: ["txt", "pdf"]
+
+# 文本分块参数
+chunk_size: 500
+chunk_overlap: 50
+separators: ["\n\n", "\n", "。", ".", "！", "!", "？", "?", "|", "；", ";", ""]

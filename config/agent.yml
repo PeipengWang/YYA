@@ -1,0 +1,7 @@
+# 智能体核心模型配置
+chat_model_name: deepseek-chat
+embedding_model_name: text-embedding-v4
+# 模型温度（0-1，越低越确定，越高越随机）
+temperature: 0.3
+# 最大工具调用迭代次数
+max_iterations: 15

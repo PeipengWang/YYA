@@ -1,0 +1,8 @@
+.idea/
+# 虚拟环境
+venv/
+# 缓存文件
+__pycache__/
+*.pyc
+*.log
+.env
