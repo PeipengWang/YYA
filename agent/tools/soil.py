@@ -24,9 +24,12 @@ DEVICE_IDENTIFIER_MAP = {
     "J": "PH阈值高",
     "K": "土壤湿度阈值低",
     "L": "土壤湿度阈值高",
+    "M": "氮肥含量",
+    "N": "氮肥含量",
+    "O": "氮肥含量",
 }
 
-SOIL_CORE_IDENTIFIERS = ["A", "B", "G", "H", "I", "J", "K", "L"]
+SOIL_CORE_IDENTIFIERS = ["A", "B", "G", "H", "I", "J", "K", "L","M","N","O"]
 
 
 def _parse_time_range(time_range: str) -> tuple[int, int, str]:
