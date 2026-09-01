@@ -6,7 +6,6 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# 假设这些是你项目里的自定义模块（根据你的截图保留）
 from utils.config_handler import chroma_conf
 from model.factory import embed_model
 from utils.path_tool import get_abs_path
@@ -15,6 +14,15 @@ from utils.logger_handler import logger
 
 
 class VectorStoreService:
+    """沂源苹果知识库向量服务。
+
+    相比初版的两点关键改进：
+    1. 上下文前缀：按文件内的 ## / ### 标题层级切分，并给每个分片注入
+       【文件名 > 小节 > 子标题】前缀，使分片被切断后仍能自解释。
+    2. 可覆盖导入：为每个分片生成确定性 id，并在导入前按 source 删除旧分片，
+       解决文件内容变更后重复导入产生脏数据的问题。
+    """
+
     def __init__(self):
         # 1. 初始化向量数据库
         self.vector_store = Chroma(
@@ -25,14 +33,14 @@ class VectorStoreService:
 
         # 2. 初始化文本分割器
         self.splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chroma_conf["chunk_size"],
-            chunk_overlap=chroma_conf["chunk_overlap"],
+            chunk_size=chroma_conf.get("chunk_size", 420),
+            chunk_overlap=chroma_conf.get("chunk_overlap", 80),
             separators=chroma_conf["separators"],
             length_function=len,
         )
 
         # 3. 启动时自动加载文档（替代外部调用）
-        # self.load_document()
+        self.load_document()
 
     def get_retriever(self):
         """获取检索器"""
@@ -242,7 +250,7 @@ if __name__ == '__main__':
 
     # 1. 检索 100 条带分数
     results_with_scores = vector_store.similarity_search_with_score(
-        query="我有抑郁症",
+        query="苹果膨大期注意点",
         k=100
     )
 

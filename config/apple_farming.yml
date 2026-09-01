@@ -15,7 +15,7 @@ default_weather_location: "沂源县"
 # ============================================================
 # 土壤设备数据接口（实时传感器数据）
 # ============================================================
-soil_device_api: http://localhost:8086
+soil_device_api: http://117.72.157.16:8086
 # 用途：获取土壤设备实时数据与历史时序数据（pH值、土壤湿度、温度、湿度、光照、报警状态等）
 # 接口详情见：获取土壤环境接口文档.md
 # 对应工具：soil_time_series_analysis
@@ -59,3 +59,182 @@ apple_phenological_periods:
   着色期: 9月上-9月下
   采收期: 10月上-10月下
   采后休眠期: 11月上-11月中
+
+# ============================================================
+# 灌溉决策阈值规则（确定性读取，不走向量检索）
+# ============================================================
+# 设计说明：
+#   灌溉阈值属于要求精确的结构化事实，不经过"语义召回 + LLM 归纳"链路，
+#   由 judge_apple_phenological_period / calculate_water_fertilizer_amount 直接读取，
+#   避免数值被模型复述后漂移。RAG 知识库只负责"为什么/怎么做"的定性依据。
+#
+# 单位约定：
+#   moisture_lower / moisture_upper —— 占田间持水量的百分比（%）
+#   quota_m3_per_mu                 —— 单次灌水定额（立方米/亩，1 亩 = 666.7 平方米）
+#   drip                            —— 滴灌水肥一体化方案（本项目默认）
+#   flood                           —— 传统灌水方案（对照参考）
+#
+# 触发规则：实测土壤含水量下降到 moisture_lower 时启动灌溉，灌至不超过 moisture_upper。
+# ============================================================
+irrigation_rules:
+
+  global:
+    moisture_base: 田间持水量百分比
+    trigger_rule: 实测土壤含水量下降到 moisture_lower 时启动灌溉，灌至不超过 moisture_upper
+    daily_window: [清晨, 傍晚]
+    daily_window_note: 高温期严禁正午灌溉，避免地温骤降伤根与水分快速蒸发
+    water_quality: 禁止使用污染水；滴灌水质要求 pH 6.5~8.5、含沙量低
+    sandy_soil_rule: 沂源山地多为砂质土，保水保肥差，采用少量多次——增加灌溉频次、降低单次定额
+    waterlogging:
+      root_hypoxia_hours: 24
+      tree_death_hours: 72
+      drainage_requirement: 大雨过后 50 厘米以上土层积水不超过 1 天
+      note: 苹果树极怕积水，根系积水超过 24 小时缺氧烂根，超过 72 小时死树
+
+  periods:
+
+    休眠期:
+      period_id: 1
+      window: 11月下-2月下
+      action: 灌封冻水
+      moisture_lower: null
+      moisture_upper: null
+      drip: {quota_m3_per_mu: "20~25", times: 2, interval_days: "5~7", depth_cm: "80~100"}
+      flood: {quota_m3_per_667m2: 120, timing: 土壤封冻前}
+      purpose: 提高树体抗寒能力，保证根系安全越冬，为来年春季萌芽储备水分
+      taboo: 土壤已封冻后禁止灌水；滴灌冬季需排空管道积水防冻裂
+      note: 封冻水在落叶后、土壤封冻前进行，滴灌分 2 次缓慢渗透，避免大水漫灌造成土壤板结
+
+    萌芽期:
+      period_id: 2
+      window: 3月上-3月下
+      moisture_lower: 70
+      moisture_upper: 80
+      drip: {quota_m3_per_mu: "15~20", times: "2~3", interval_days: "3~5", depth_cm: "60~80"}
+      flood: {quota_m3_per_667m2: 100, times: 1, timing: "3.10~3.25"}
+      purpose: 促使萌芽整齐一致，新梢健壮生长，提高开花坐果率
+      taboo: 避免大水漫灌导致地温骤降，保护早春活跃的浅层根系
+      note: 春旱时需灌催芽水；倒春寒年份更应提前灌水，增加土壤水分与果园空气湿度以减轻低温危害
+
+    花期:
+      period_id: 3
+      window: 4月上-4月下
+      moisture_lower: null
+      moisture_upper: null
+      drip: {quota_m3_per_mu: 30, times: 1, timing: 开花前完成}
+      flood: {quota_m3_per_667m2: 30, times: 1, timing: "4.1~4.10"}
+      purpose: 花前补足底墒，花期不再灌水
+      taboo: 花期严禁灌水，否则引起落花落果；蜜蜂活动期禁止使用杀虫药剂
+      note: 灌溉必须在开花前结束。整个花期至幼果期不灌水，是苹果水分管理最重要的禁忌之一
+
+    新梢生长期:
+      period_id: 4
+      window: 5月上-6月上
+      moisture_lower: 70
+      moisture_upper: 80
+      drip: {quota_m3_per_mu: "10~15", interval_days: "7~10", timing: 谢花后 10~15 天启动}
+      flood: {quota_m3_per_667m2: 30, times: 3, timing: "4.20~5.20"}
+      purpose: 满足幼果细胞分裂膨大需求，促进花芽生理分化，减少生理落果
+      critical: true
+      critical_note: 全年第一个需水临界期。此期缺水会对当年树体发育和产量产生不可恢复的影响
+      taboo: 谢花后 10~15 天内不得提前灌水；适度控水至 60%~65% 更利于花芽分化
+      note: 5 月中上旬是苹果年生长周期中对水分最敏感、需水量最多的时期，且正值春季干旱期
+
+    膨果期:
+      period_id: 5
+      window: 6月中-8月下
+      moisture_lower: 80
+      moisture_upper: 85
+      critical: true
+      critical_note: 全年需水高峰期。土壤含水量应保持在田间持水量 80%~85%
+      taboo: 严禁土壤干湿剧烈变化，否则导致裂果与早期落叶
+      note: |
+        本期内水分管理方向在 6 月与 7~8 月相反，必须分两段处理：
+        · 6 月（花芽生理分化期）：适度控水，土壤含水量降至田间持水量 60%~65% 更利于花芽分化。
+          低于 60% 时补灌，单次定额 15 立方米/667 平方米，约 9 次（5.20~8.20）。
+        · 7~8 月（果实迅速膨大期）：全年需水高峰，含水量维持 80%~85%，
+          滴灌每 5~7 天一次、单次 15~20 立方米/亩；沙质土改为每天一次、每次 5~8 立方米/亩。
+        · 第二次膨果期（8.20~9.25）：灌溉 2 次，定额 30 立方米/667 平方米。
+      sub_periods:
+        花芽分化期:
+          window: 6月中-6月下
+          moisture_lower: 60
+          moisture_upper: 65
+          drip: {quota_m3_per_mu: 15, times: "约9次", timing: "5.20~8.20，低于60%时补灌"}
+          purpose: 控水促进花芽生理分化
+        果实迅速膨大期:
+          window: 7月上-8月下
+          moisture_lower: 80
+          moisture_upper: 85
+          drip: {quota_m3_per_mu: "15~20", interval_days: "5~7"}
+          drip_sandy: {quota_m3_per_mu: "5~8", interval_days: 1}
+          purpose: 防止果实发育不良及早期落叶，确保果实个头长足
+
+    着色期:
+      period_id: 6
+      window: 9月上-9月下
+      moisture_lower: 60
+      moisture_upper: 65
+      drip: {quota_m3_per_mu: "≤5", timing: 仅在严重干旱时少量补水}
+      flood: {quota_m3_per_667m2: 10, times: 1, timing: "9.25~10.15"}
+      purpose: 控水促进糖分积累、花青素合成和果皮着色，提高果实硬度和耐贮性
+      taboo: 严禁大水漫灌，否则严重影响糖分积累与着色并增加裂果风险
+      note: 从采收前 20 天开始逐步减少灌水量；中早熟品种采收前 30 天左右即应开始减少水肥供应
+
+    采收期:
+      period_id: 7
+      window: 10月上-10月下
+      moisture_lower: null
+      moisture_upper: null
+      action: 停止灌溉
+      taboo: 采收前 15 天必须停止灌水
+      purpose: 控水提升果实含糖量、着色度与耐贮性，降低裂果率
+      note: 雨后及时排涝保持土壤疏松；采收前 21 天起禁止使用杀虫药剂
+
+    采后休眠期:
+      period_id: 8
+      window: 11月上-11月中
+      action: 秋施基肥后灌水，并准备封冻水
+      moisture_lower: null
+      moisture_upper: null
+      drip: {quota_m3_per_mu: "20~25", times: 2, interval_days: "5~7"}
+      purpose: 促进断根愈合与基肥吸收，为越冬和来年萌芽储备水分
+      note: 基肥在果实采收后 20~30 天施入（9 月中旬~10 月中旬，晚熟品种采收后越快越好），施后及时灌水
+
+# ============================================================
+# 施肥量化规则（确定性读取，供水肥计算工具使用）
+# ============================================================
+fertilizer_rules:
+  per_100kg_fruit:
+    N_kg: "1.0~1.2"
+    P2O5_kg: "0.5~0.75"
+    K2O_kg: "1.0~1.2"
+    note: 沂源地理标志规范口径；滴灌水肥一体化团体标准口径略低（N 0.7~1、P2O5 0.35~0.5、K2O 0.7~1），山地瘠薄园取高值
+
+  npk_ratio_by_age:
+    幼树: "2:2:1"
+    成龄结果树: "2:1:2"
+    盛果后期: "1:1:2"
+
+  base_fertilizer:
+    timing: 果实采收后至落叶前，9 月中旬~10 月中旬
+    organic_kg_per_mu: "3000~5000"
+    principle: 斤果斤肥或斤果一斤半肥
+    compound_15_15_15_kg_per_mu: "50~80"
+    micro_kg_per_mu: "20~30"
+    depth_cm: "30~40"
+    method: 沟施或穴施
+    share_of_year: "占比 60% 以上"
+    note: 此期根系处于最后一次生长高峰，断根愈合快，能最大程度储备养分供来年萌芽开花
+
+  topdressing:
+    萌芽肥: {timing: "3 月中旬~4 月初", formula: "高氮型 30-10-10", kg_per_mu: "8~10", times: 2}
+    花芽分化肥: {timing: "6 月上中旬", formula: "平衡型 20-20-20", kg_per_mu: "10~12", times: 2}
+    膨果前期: {timing: "7 月上中旬", formula: "高钾型 16-8-32", kg_per_mu: "12~15", times: 3}
+    膨果盛期: {timing: "8 月上中旬", formula: "高钾型 12-6-40", kg_per_mu: "15~18", times: 3}
+
+  foliar:
+    花期: "0.1%~0.3% 硼砂 + 0.2% 尿素，保花保果"
+    幼果期至套袋前: "0.12%~0.17% 氨基酸钙 2~3 次，间隔 7~10 天，预防苦痘病"
+    7月至10月: "0.1%~0.2% 磷酸二氢钾 3~4 次，促进着色和枝条成熟"
+    采果后: "0.5% 尿素 + 0.3% 磷酸二氢钾，延长叶片功能期"

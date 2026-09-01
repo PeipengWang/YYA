@@ -34,14 +34,36 @@ def judge_apple_phenological_period() -> str:
     """
     logger.info("[Tool] judge_apple_phenological_period 被调用")
     period = _current_phenological_period()
+
+    rule = period.get("irrigation_rule") or {}
+    global_rule = period.get("irrigation_global") or {}
+
+    # 阈值来自配置，确定性输出；RAG 知识库只补充原理与操作细节
+    irrigation_threshold = {
+        "含水量基准": global_rule.get("moisture_base", "田间持水量百分比"),
+        "触发规则": global_rule.get("trigger_rule", "含水量降至下限时启动灌溉"),
+        "当前期适宜下限_百分比": rule.get("moisture_lower"),
+        "当前期适宜上限_百分比": rule.get("moisture_upper"),
+        "滴灌方案": rule.get("drip") or rule.get("推荐定额"),
+        "灌溉时段": global_rule.get("daily_window"),
+        "禁忌": rule.get("taboo"),
+        "说明": rule.get("purpose") or rule.get("note"),
+    }
+    if rule.get("当前子期"):
+        irrigation_threshold["当前子期"] = rule["当前子期"]
+    if rule.get("critical"):
+        irrigation_threshold["临界期提示"] = rule.get("critical_note")
+
     result = {
         "判定时间": datetime.now().strftime("%Y-%m-%d"),
         "当前物候期": period["period_name"],
         "时间段": period["date_range"],
         "核心生长需求": period["core_needs"],
+        "灌溉阈值（来自配置，精确值）": irrigation_threshold,
+        "防涝要求": (global_rule.get("waterlogging") or {}).get("drainage_requirement"),
         "属地": "山东省淄博市沂源县",
         "山地苹果物候特点": "沂源山地昼夜温差大，物候期较平原晚3-5天，着色期糖分积累优势明显",
-        "数据来源": "基于沂源本地积温与物候规律自动判定",
+        "数据来源": "物候期基于沂源本地积温与物候规律自动判定；灌溉阈值读取自 config/apple_farming.yml",
     }
     return json.dumps(result, ensure_ascii=False, indent=2)
 

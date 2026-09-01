@@ -9,10 +9,17 @@ collection_name: apple_farming_knowledge
 persist_directory: chroma_db
 
 # 检索返回Top-K文档数
-k: 5
+k: 8
 
-# 知识库文件存放路径
-data_path: data\apple_knowledge
+# 检索方式：similarity（纯相似度）| mmr（最大边际相关性，提升结果多样性，避免同一文件刷屏）
+search_type: mmr
+# MMR 模式下的候选池大小（仅在 search_type=mmr 时生效）
+fetch_k: 24
+# MMR 多样性权重，0=最大多样、1=最大相关
+lambda_mult: 0.7
+
+# 知识库文件存放路径（用正斜杠，保证 Windows / Linux 都能正确拼接）
+data_path: data/apple_knowledge
 
 # 已处理文件MD5记录文件
 md5_hex_store: md5.text
@@ -20,7 +27,19 @@ md5_hex_store: md5.text
 # 允许加载的知识库文件类型
 allow_knowledge_file_type: ["txt", "pdf"]
 
+# ============================================================
 # 文本分块参数
-chunk_size: 500
-chunk_overlap: 50
+# ============================================================
+# chunk_size 由 500 下调至 420：农技文本信息密度高，段略小可提升数值类召回精度
+# chunk_overlap 由 50 上调至 80：减少表格与列表被腰斩后上下文断裂
+chunk_size: 420
+chunk_overlap: 80
 separators: ["\n\n", "\n", "。", ".", "！", "!", "？", "?", "|", "；", ";", ""]
+
+# 是否为每个分片注入【文件名 > 小节 > 子标题】上下文前缀（强烈建议开启）
+# 开启后即使分片被切断，也能自解释主题，显著提升召回可用性
+enable_context_prefix: true
+
+# 导入策略：overwrite（按文件覆盖，先删旧分片再写入）| append（仅追加，会产生重复）
+# 选择 overwrite 时会对每个分片生成确定性 id，实现重复导入即覆盖
+import_mode: overwrite
