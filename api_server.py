@@ -3,6 +3,10 @@ import os
 import sqlite3
 import re
 import time
+import asyncio
+import urllib.request
+import urllib.error
+import urllib.parse
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -23,6 +27,7 @@ app.add_middleware(
 )
 
 TTS_URL = rag_conf["TTS_URL"]
+ASR_API_URL = rag_conf.get("ASR_API_URL", "http://127.0.0.1:9001/asr")
 
 agent = ReactAgent()
 
@@ -97,6 +102,103 @@ async def chat_stream(request: Request):
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
         },
+    )
+
+
+# ===========================
+# 语音识别接口（ASR）
+# 前端把麦克风录的音频传上来，这里原样转发给本地 faster-whisper 服务，
+# 避免浏览器直连时受跨域/部署环境限制。用标准库 urllib，不额外引入依赖。
+# ===========================
+@app.post("/api/asr")
+async def asr(request: Request):
+    """语音转文字。
+
+    把浏览器上传的 multipart 音频原样透传给本地 faster-whisper 服务，
+    不做二次编解码，也不依赖 python-multipart。返回 {code, text}。
+    """
+    body = await request.body()
+    if not body:
+        return JSONResponse({"code": -1, "msg": "音频内容为空"}, status_code=400)
+
+    content_type = request.headers.get("content-type", "")
+    if "multipart/form-data" not in content_type:
+        return JSONResponse(
+            {"code": -1, "msg": f"请求类型必须是 multipart/form-data，当前为 {content_type!r}"},
+            status_code=400,
+        )
+
+    req = urllib.request.Request(
+        ASR_API_URL,
+        data=body,
+        headers={"Content-Type": content_type},
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "ignore")[:500]
+        return JSONResponse(
+            {"code": -1, "msg": f"ASR 服务返回错误 {e.code}：{detail}"}, status_code=502
+        )
+    except Exception as e:
+        return JSONResponse(
+            {"code": -1, "msg": f"无法连接 ASR 服务（{ASR_API_URL}）：{e}"}, status_code=502
+        )
+
+    return {
+        "code": 0,
+        "text": payload.get("text", ""),
+        "language": payload.get("language"),
+        "duration": payload.get("duration"),
+    }
+
+
+# ===========================
+# 语音合成接口（TTS）
+# 与 /api/asr 同理：浏览器只认同源的 /api，由网关转发到 TTS 服务，避免直连。
+# ===========================
+@app.get("/api/tts-stream")
+async def tts_stream(
+    text: str,
+    voice: str = "zh-CN-XiaoxiaoNeural",
+    rate: str = "+0%",
+    volume: str = "+0%",
+    pitch: str = "+0Hz",
+):
+    """语音播报：转发给本地 edge-tts 服务，并把音频流原样回传给浏览器"""
+    if not text.strip():
+        return JSONResponse({"code": -1, "msg": "text 参数不能为空"}, status_code=400)
+
+    query = urllib.parse.urlencode(
+        {"text": text, "voice": voice, "rate": rate, "volume": volume, "pitch": pitch}
+    )
+    url = f"{TTS_URL}?{query}"
+
+    try:
+        # urlopen / read 是阻塞调用，丢到线程里执行，避免卡住事件循环
+        upstream = await asyncio.to_thread(urllib.request.urlopen, url, None, 60)
+    except Exception as e:
+        return JSONResponse(
+            {"code": -1, "msg": f"无法连接 TTS 服务（{TTS_URL}）：{e}"}, status_code=502
+        )
+
+    async def audio_generator():
+        try:
+            while True:
+                chunk = await asyncio.to_thread(upstream.read, 8192)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            upstream.close()
+
+    return StreamingResponse(
+        audio_generator(),
+        media_type="audio/mpeg",
+        headers={"Cache-Control": "no-store"},
     )
 
 
